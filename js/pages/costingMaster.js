@@ -5,7 +5,11 @@ import { escapeHtml, fmtMoney, fmtNum, fmtDate, toastError, openModal, closeModa
 let costings = [];
 
 async function loadCostings() {
-  const { data, error } = await supabase.from('costings').select('*, products(name)').order('created_at', { ascending: false }).limit(300);
+  // costings has two FKs to products (product_id and the unused
+  // dpl_product_id), so the embed must name product_id explicitly —
+  // the bare `products(name)` shorthand is ambiguous and PostgREST
+  // refuses the query ("more than one relationship was found").
+  const { data, error } = await supabase.from('costings').select('*, products!costings_product_id_fkey(name)').order('created_at', { ascending: false }).limit(300);
   if (error) throw error;
   return data || [];
 }
