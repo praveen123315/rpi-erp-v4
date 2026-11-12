@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raunaq Paint Industry – ERP System v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand-name">Raunaq Paint Industry</div>
+    <div class="brand-tagline">ERP System v4 — sign in</div>
+    <form id="login-form">
+      <div class="form-field" style="margin-bottom:12px;text-align:left;">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="login-email" autocomplete="username" required>
+      </div>
+      <div class="form-field" style="text-align:left;">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="login-password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="login-submit" style="margin-top:20px;">Sign in</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ APP SHELL ═══ -->
+<div id="app-shell">
+  <div id="page-progress-bar"></div>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="page-title">Dashboard</div>
+        <div class="topbar-sub" id="page-sub">Overview of today's activity</div>
+      </div>
+      <div class="topbar-right">
+        <div class="user-chip">
+          <div class="user-avatar" id="user-avatar">–</div>
+          <div>
+            <div id="user-name" style="font-weight:600;">—</div>
+            <div id="user-role" class="text-muted" style="font-size:11px;"></div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="logout-btn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="page-container"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop"></div>
+<div id="toast-stack"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
