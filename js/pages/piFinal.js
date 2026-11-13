@@ -1,8 +1,11 @@
 // Final PI Database — registered proforma invoices, read-mostly.
 import { supabase } from '../supabaseClient.js';
 import { escapeHtml, fmtMoney, fmtDate, toastError, openModal, closeModal, filterRows, emptyRow, debounce } from '../ui.js';
+import { printPi } from '../piPrint.js';
 
 let pis = [];
+let salespeople = [];
+const filters = { search: '', salespersonId: '', from: '', to: '' };
 
 async function loadPis() {
   const { data, error } = await supabase
@@ -14,6 +17,12 @@ async function loadPis() {
   return data || [];
 }
 
+async function loadSalespeople() {
+  const { data, error } = await supabase.from('salespeople').select('id,name').order('name');
+  if (error) throw error;
+  return data || [];
+}
+
 function piTotal(p) {
   return (p.pi_lines || []).reduce((s, l) => s + Number(l.total_value || 0), 0);
 }
@@ -21,7 +30,7 @@ function piTotal(p) {
 export async function renderPiFinal(container) {
   container.innerHTML = `<div class="loading-row"><span class="spinner"></span> &nbsp;Loading…</div>`;
   try {
-    pis = await loadPis();
+    [pis, salespeople] = await Promise.all([loadPis(), loadSalespeople()]);
   } catch (err) {
     toastError(err, 'Could not load Final PI database');
     container.innerHTML = `<div class="empty-state">Could not load proforma invoices.</div>`;
@@ -30,30 +39,62 @@ export async function renderPiFinal(container) {
   paint();
 
   function paint() {
+    const filtered = applyFilters(pis);
     container.innerHTML = `
       <div class="page-head">
-        <div><h2 class="section-heading">Final PI Database</h2><p class="section-sub">${pis.length} proforma invoice${pis.length === 1 ? '' : 's'}</p></div>
+        <div><h2 class="section-heading">Final PI Database</h2><p class="section-sub">${filtered.length} of ${pis.length} proforma invoice${pis.length === 1 ? '' : 's'}</p></div>
       </div>
       <div class="table-wrap">
-        <div class="table-toolbar">
-          <div class="search-box"><input class="form-input" id="pf-search" placeholder="Search PI number or customer…"></div>
+        <div class="table-toolbar" style="flex-wrap:wrap;gap:8px;">
+          <div class="search-box"><input class="form-input" id="pf-search" placeholder="Search PI number or customer…" value="${escapeHtml(filters.search)}"></div>
+          <select class="form-input" id="pf-sp" style="max-width:180px;">
+            <option value="">All Salespersons</option>
+            ${salespeople.map(sp => `<option value="${sp.id}" ${filters.salespersonId === sp.id ? 'selected' : ''}>${escapeHtml(sp.name)}</option>`).join('')}
+          </select>
+          <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;">From <input type="date" class="form-input" id="pf-from" style="max-width:150px;" value="${filters.from}"></label>
+          <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;">To <input type="date" class="form-input" id="pf-to" style="max-width:150px;" value="${filters.to}"></label>
+          <button class="btn btn-outline btn-sm" id="pf-clear">Clear</button>
         </div>
         <div class="table-scroll">
           <table class="erp-table">
             <thead><tr><th>PI Number</th><th>Date</th><th>Customer</th><th>Salesperson</th><th>Lines</th><th>Total</th><th>Source</th><th></th></tr></thead>
-            <tbody id="pf-tbody">${rowsHtml(pis)}</tbody>
+            <tbody id="pf-tbody">${rowsHtml(filtered)}</tbody>
           </table>
         </div>
       </div>`;
     document.getElementById('pf-search').addEventListener('input', debounce((e) => {
-      const needle = e.target.value.trim().toLowerCase();
-      const filtered = !needle ? pis : pis.filter(p =>
-        p.pi_number.toLowerCase().includes(needle) ||
-        (p.customers?.name || p.customer_name_text || '').toLowerCase().includes(needle));
-      document.getElementById('pf-tbody').innerHTML = rowsHtml(filtered);
-      wireRows();
+      filters.search = e.target.value;
+      refreshTable();
     }, 200));
+    document.getElementById('pf-sp').addEventListener('change', (e) => { filters.salespersonId = e.target.value; refreshTable(); });
+    document.getElementById('pf-from').addEventListener('change', (e) => { filters.from = e.target.value; refreshTable(); });
+    document.getElementById('pf-to').addEventListener('change', (e) => { filters.to = e.target.value; refreshTable(); });
+    document.getElementById('pf-clear').addEventListener('click', () => {
+      filters.search = ''; filters.salespersonId = ''; filters.from = ''; filters.to = '';
+      paint();
+    });
     wireRows();
+  }
+
+  function refreshTable() {
+    const filtered = applyFilters(pis);
+    document.getElementById('pf-tbody').innerHTML = rowsHtml(filtered);
+    container.querySelector('.section-sub').textContent = `${filtered.length} of ${pis.length} proforma invoice${pis.length === 1 ? '' : 's'}`;
+    wireRows();
+  }
+
+  function applyFilters(rows) {
+    return rows.filter(p => {
+      if (filters.search) {
+        const needle = filters.search.trim().toLowerCase();
+        const hay = `${p.pi_number} ${p.customers?.name || p.customer_name_text || ''}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      if (filters.salespersonId && p.salesperson_id !== filters.salespersonId) return false;
+      if (filters.from && p.pi_date < filters.from) return false;
+      if (filters.to && p.pi_date > filters.to) return false;
+      return true;
+    });
   }
 
   function rowsHtml(rows) {
@@ -100,8 +141,8 @@ export async function renderPiFinal(container) {
           </tbody>
         </table>
       </div>`;
-    openModal({ title: p.pi_number, bodyHtml: body, wide: true, footHtml: `<button class="btn btn-outline" data-cancel>Close</button> <button class="btn btn-primary" data-print>Print</button>` });
+    openModal({ title: p.pi_number, bodyHtml: body, wide: true, footHtml: `<button class="btn btn-outline" data-cancel>Close</button> <button class="btn btn-primary" data-print>Print PI</button>` });
     document.querySelector('[data-cancel]').addEventListener('click', closeModal);
-    document.querySelector('[data-print]').addEventListener('click', () => window.print());
+    document.querySelector('[data-print]').addEventListener('click', () => printPi(p, lines));
   }
 }
