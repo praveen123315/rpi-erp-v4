@@ -149,7 +149,7 @@ export async function renderOrderRegister(container) {
       const distinctPiIds = [...new Set((plRows || []).map(r => r.pi_id))];
       const { data: piRows } = await supabase
         .from('proforma_invoices')
-        .select('*, customers(name,customer_code), salespeople(name), pi_lines(*)')
+        .select('*, customers(name,customer_code), salespeople(name), pi_lines(*, pack_sizes(units_per_carton))')
         .in('id', distinctPiIds);
       pis = piRows || [];
     }

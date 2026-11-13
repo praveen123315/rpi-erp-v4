@@ -118,7 +118,7 @@ export async function renderPiFinal(container) {
 
   async function viewPi(piId) {
     const p = pis.find(x => x.id === piId);
-    const { data: lines, error } = await supabase.from('pi_lines').select('*').eq('pi_id', piId).order('line_no');
+    const { data: lines, error } = await supabase.from('pi_lines').select('*, pack_sizes(units_per_carton)').eq('pi_id', piId).order('line_no');
     if (error) { toastError(error, 'Could not load PI lines'); return; }
     const body = `
       <div style="margin-bottom:12px;font-size:13px;color:var(--ink-soft);">
