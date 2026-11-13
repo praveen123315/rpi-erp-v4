@@ -6,13 +6,19 @@ import { printPi } from '../piPrint.js';
 let pis = [];
 let salespeople = [];
 const filters = { search: '', salespersonId: '', from: '', to: '' };
+// Display sort — independent of fetch order. Defaults to latest PI date
+// on top, which is what matters to the user, not insertion order.
+const sort = { key: 'pi_date', dir: 'desc' };
 
 async function loadPis() {
   const { data, error } = await supabase
     .from('proforma_invoices')
     .select('*, customers(name,customer_code), salespeople(name), pi_lines(id,pcs,total_value)')
     .order('created_at', { ascending: false })
-    .limit(300);
+    // Raised from 300: a single bulk "Register All" run can mint
+    // hundreds of new PIs in one go, and at 300 some of that very batch
+    // could already be pushed off the end of this list.
+    .limit(2000);
   if (error) throw error;
   return data || [];
 }
@@ -50,7 +56,7 @@ export async function renderPiFinal(container) {
   paint();
 
   function paint() {
-    const filtered = applyFilters(pis);
+    const filtered = applySort(applyFilters(pis));
     container.innerHTML = `
       <div class="page-head">
         <div><h2 class="section-heading">Final PI Database</h2><p class="section-sub">${filtered.length} of ${pis.length} proforma invoice${pis.length === 1 ? '' : 's'}</p></div>
@@ -68,7 +74,11 @@ export async function renderPiFinal(container) {
         </div>
         <div class="table-scroll">
           <table class="erp-table">
-            <thead><tr><th>PI Number</th><th>Date</th><th>Customer</th><th>Salesperson</th><th>Lines</th><th>Total</th><th>Source</th><th></th></tr></thead>
+            <thead><tr>
+              <th class="sortable" data-sort-key="pi_number" style="cursor:pointer;user-select:none;">PI Number${sortArrow('pi_number')}</th>
+              <th class="sortable" data-sort-key="pi_date" style="cursor:pointer;user-select:none;">Date${sortArrow('pi_date')}</th>
+              <th>Customer</th><th>Salesperson</th><th>Lines</th><th>Total</th><th>Source</th><th></th>
+            </tr></thead>
             <tbody id="pf-tbody">${rowsHtml(filtered)}</tbody>
           </table>
         </div>
@@ -84,11 +94,39 @@ export async function renderPiFinal(container) {
       filters.search = ''; filters.salespersonId = ''; filters.from = ''; filters.to = '';
       paint();
     });
+    container.querySelectorAll('[data-sort-key]').forEach(th => th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (sort.key === key) {
+        sort.dir = sort.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        sort.key = key;
+        sort.dir = 'desc';
+      }
+      paint(); // rebuild so the arrow in the header moves too
+    }));
     wireRows();
   }
 
+  function sortArrow(key) {
+    if (sort.key !== key) return '';
+    return sort.dir === 'desc' ? ' ▼' : ' ▲';
+  }
+
+  function applySort(rows) {
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = sort.key === 'pi_date' ? (a.pi_date || '') : (a.pi_number || '');
+      const bv = sort.key === 'pi_date' ? (b.pi_date || '') : (b.pi_number || '');
+      if (av !== bv) return av < bv ? -1 * dir : 1 * dir;
+      // Tie-break (e.g. many PIs sharing today's date after a bulk
+      // register run): most recently created first, regardless of the
+      // column's own sort direction.
+      return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+  }
+
   function refreshTable() {
-    const filtered = applyFilters(pis);
+    const filtered = applySort(applyFilters(pis));
     document.getElementById('pf-tbody').innerHTML = rowsHtml(filtered);
     container.querySelector('.section-sub').textContent = `${filtered.length} of ${pis.length} proforma invoice${pis.length === 1 ? '' : 's'}`;
     wireRows();
