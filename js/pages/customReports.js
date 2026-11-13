@@ -51,12 +51,26 @@ function displayValue(field, value) {
 function pad(n) { return String(n).padStart(2, '0'); }
 
 async function loadRecords(from, to) {
-  const { data: pis, error } = await supabase
-    .from('proforma_invoices')
-    .select('id, pi_date, source, customer_name_text, customers(name), salespeople(name), pi_lines(product_text,shade_text,pack_text,pcs,litres,total_value)')
-    .gte('pi_date', from).lte('pi_date', to)
-    .limit(5000);
-  if (error) throw error;
+  // Paginate through every matching PI — a date range can easily span
+  // thousands of rows (7500+ PIs system-wide), and a single capped
+  // .limit() with no explicit order returns an arbitrary subset (looked
+  // like "only the last 3 months" even with a full-year filter). .range()
+  // pages through in a stable pi_date order until nothing is left.
+  const pageSize = 1000;
+  const pis = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('proforma_invoices')
+      .select('id, pi_date, source, customer_name_text, customers(name), salespeople(name), pi_lines(product_text,shade_text,pack_text,pcs,litres,total_value)')
+      .gte('pi_date', from).lte('pi_date', to)
+      .order('pi_date', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    pis.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+    offset += pageSize;
+  }
 
   const records = [];
   (pis || []).forEach(pi => {
