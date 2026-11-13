@@ -53,6 +53,7 @@ export async function renderOrderRegister(container) {
     container.innerHTML = `
       <div class="page-head">
         <div><h2 class="section-heading">Order Register</h2><p class="section-sub">${filtered.length} of ${orders.length} saved order${orders.length === 1 ? '' : 's'}</p></div>
+        <button class="btn btn-primary btn-sm" id="or-register-all">Register All Unregistered</button>
       </div>
       <div class="table-wrap">
         <div class="table-toolbar" style="flex-wrap:wrap;gap:8px;">
@@ -83,7 +84,59 @@ export async function renderOrderRegister(container) {
       filters.search = ''; filters.salespersonId = ''; filters.from = ''; filters.to = '';
       paint();
     });
+    document.getElementById('or-register-all').addEventListener('click', registerAllUnregistered);
     wireRows();
+  }
+
+  // Register every order system-wide that still has unregistered lines —
+  // not just the (at most 300, most-recent) orders shown in this table.
+  // Reuses the exact same register_pi() RPC as the per-row "Register to
+  // PI" button, called once per order, so it's the same safe/idempotent
+  // logic — just looped instead of clicked one at a time.
+  async function registerAllUnregistered() {
+    const btn = document.getElementById('or-register-all');
+    const { data: rows, error: findErr } = await supabase
+      .from('order_lines')
+      .select('order_id')
+      .is('pi_line_id', null);
+    if (findErr) { toastError(findErr, 'Could not check for unregistered lines'); return; }
+    const orderIds = [...new Set((rows || []).map(r => r.order_id))];
+    if (!orderIds.length) {
+      toast('Nothing to register — every order is already fully registered.', 'info');
+      return;
+    }
+    const ok = await confirmDialog(
+      `${orderIds.length} order${orderIds.length === 1 ? '' : 's'} (across the whole system, not just what's shown here) still ha${orderIds.length === 1 ? 's' : 've'} unregistered lines. This will create one new Final PI per order for just those lines — same as clicking "Register to PI" on each, one after another. It can take a few minutes for this many and cannot be undone. Continue?`,
+      { title: 'Register All Unregistered', confirmLabel: `Register ${orderIds.length} order${orderIds.length === 1 ? '' : 's'}` }
+    );
+    if (!ok) return;
+
+    btn.disabled = true;
+    let done = 0, failed = 0;
+    for (let i = 0; i < orderIds.length; i++) {
+      const orderId = orderIds[i];
+      if (registering.has(orderId)) continue; // being handled by an individual click elsewhere
+      registering.add(orderId);
+      btn.textContent = `Registering… (${i + 1}/${orderIds.length})`;
+      try {
+        const { error } = await supabase.rpc('register_pi', { p_order_id: orderId });
+        if (error) throw error;
+        done++;
+      } catch (err) {
+        failed++;
+        console.error('Register All — order', orderId, 'failed:', err);
+      } finally {
+        registering.delete(orderId);
+      }
+    }
+
+    orders = await loadOrders();
+    paint();
+    toast(
+      `Registered ${done} order${done === 1 ? '' : 's'}${failed ? `. ${failed} failed — see browser console for details.` : ' successfully.'}`,
+      failed ? 'error' : 'success',
+      7000
+    );
   }
 
   // Re-render just the table body + count, without rebuilding the filter
