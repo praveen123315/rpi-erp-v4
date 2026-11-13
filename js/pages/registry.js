@@ -22,6 +22,7 @@ import { renderSalespersonReport } from './salespersonReport.js';
 import { renderCustomerPL } from './customerPL.js';
 import { renderProfitLoss } from './profitLoss.js';
 import { renderStockPlanner } from './stockPlanner.js';
+import { renderCustomReports } from './customReports.js';
 import { renderUsersAccess } from './usersAccess.js';
 import { renderSystemOptions } from './systemOptions.js';
 import { renderBulkImport } from './bulkImport.js';
@@ -70,6 +71,7 @@ export const NAV_STRUCTURE = [
   ]},
   { section: 'Analytics', items: [
     { id: 'reports', label: 'Reports', icon: 'bars', render: renderReports, sub: 'Sales and order summaries' },
+    { id: 'custom-reports', label: 'Custom Reports', icon: 'grid', render: renderCustomReports, sub: 'Drag-and-drop pivot-style report builder' },
     { id: 'salesperson-report', label: 'SP Sales Report', icon: 'user', render: renderSalespersonReport, sub: 'Per-salesperson performance' },
     { id: 'customer-pl', label: 'Customer P&L', icon: 'trend', render: renderCustomerPL, sub: 'Profitability by customer' },
     { id: 'stock-planner', label: 'Stock Planner', icon: 'box', render: renderStockPlanner, sub: 'Projected stock requirement' },

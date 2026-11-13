@@ -277,6 +277,34 @@ table.erp-table tbody tr:last-child td { border-bottom: none; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .gap-2 { display: flex; gap: 8px; align-items: center; }
 
+/* ── Custom Report builder (drag-and-drop pivot) ───────────────────── */
+.crb-builder { display: flex; gap: 20px; flex-wrap: wrap; }
+.crb-palette { flex: 1 1 220px; min-width: 200px; }
+.crb-group { margin-bottom: 16px; }
+.crb-group-title { font-size: 11px; font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.crb-pill {
+  display: inline-flex; align-items: center; padding: 6px 12px; margin: 0 6px 6px 0;
+  background: var(--saffron-pale); color: var(--saffron-dark); border: 1px solid var(--saffron-light);
+  border-radius: 20px; font-size: 12.5px; font-weight: 600; cursor: grab; user-select: none;
+}
+.crb-pill.is-measure { background: var(--blue-light); color: var(--blue-accent); border-color: var(--blue-accent); }
+.crb-pill:active { cursor: grabbing; }
+.crb-zones { flex: 2 1 420px; display: flex; flex-direction: column; gap: 12px; min-width: 280px; }
+.crb-zone { border: 1.5px dashed var(--stone); border-radius: var(--radius); padding: 10px 12px; background: var(--warm-white); }
+.crb-zone-title { font-size: 11px; font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.crb-zone-body { min-height: 36px; display: flex; flex-wrap: wrap; gap: 6px; }
+.crb-zone-body.drag-over { background: var(--saffron-pale); border-radius: var(--radius-sm); }
+.crb-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px;
+  background: var(--ink); color: #fff; border-radius: 20px; font-size: 12.5px; font-weight: 600;
+}
+.crb-chip button {
+  border: none; background: rgba(255,255,255,0.18); color: #fff; width: 18px; height: 18px;
+  border-radius: 50%; cursor: pointer; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.crb-chip button:hover { background: var(--red-accent); }
+.crb-zone-empty { color: var(--ink-muted); font-size: 12px; padding: 4px 0; }
+
 @media print {
   .sidebar, .topbar, .no-print { display: none !important; }
   .main-area { margin-left: 0; }
