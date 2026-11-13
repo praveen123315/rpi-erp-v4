@@ -10,11 +10,18 @@ const filters = { search: '', salespersonId: '', from: '', to: '' };
 async function loadPis() {
   const { data, error } = await supabase
     .from('proforma_invoices')
-    .select('*, customers(name,customer_code), salespeople(name), pi_lines(id,total_value)')
+    .select('*, customers(name,customer_code), salespeople(name), pi_lines(id,pcs,total_value)')
     .order('created_at', { ascending: false })
     .limit(300);
   if (error) throw error;
   return data || [];
+}
+
+// A lot of historical (migrated) PIs carry leftover zero-qty/zero-amount
+// "empty slot" lines from the old Sheets import — don't count or show
+// these as real line items.
+function realLines(pi) {
+  return (pi.pi_lines || []).filter(l => Number(l.pcs || 0) !== 0 || Number(l.total_value || 0) !== 0);
 }
 
 async function loadSalespeople() {
@@ -25,6 +32,10 @@ async function loadSalespeople() {
 
 function piTotal(p) {
   return (p.pi_lines || []).reduce((s, l) => s + Number(l.total_value || 0), 0);
+}
+
+function piLineCount(p) {
+  return realLines(p).length;
 }
 
 export async function renderPiFinal(container) {
@@ -105,7 +116,7 @@ export async function renderPiFinal(container) {
         <td>${fmtDate(p.pi_date)}</td>
         <td>${escapeHtml(p.customers?.name || p.customer_name_text || '—')}</td>
         <td>${escapeHtml(p.salespeople?.name || '—')}</td>
-        <td>${(p.pi_lines || []).length}</td>
+        <td>${piLineCount(p)}</td>
         <td>${fmtMoney(piTotal(p))}</td>
         <td>${p.source === 'historical' ? '<span class="badge badge-gray">Historical</span>' : '<span class="badge badge-saffron">Sales</span>'}</td>
         <td><button class="btn btn-outline btn-sm" data-view="${p.id}">View</button></td>
@@ -118,8 +129,11 @@ export async function renderPiFinal(container) {
 
   async function viewPi(piId) {
     const p = pis.find(x => x.id === piId);
-    const { data: lines, error } = await supabase.from('pi_lines').select('*, pack_sizes(units_per_carton)').eq('pi_id', piId).order('line_no');
+    const { data: rawLines, error } = await supabase.from('pi_lines').select('*, pack_sizes(units_per_carton)').eq('pi_id', piId).order('line_no');
     if (error) { toastError(error, 'Could not load PI lines'); return; }
+    // Historical imports left zero-qty/zero-amount "empty slot" lines on
+    // many PIs — don't show those as if they were ordered.
+    const lines = (rawLines || []).filter(l => Number(l.pcs || 0) !== 0 || Number(l.total_value || 0) !== 0);
     const body = `
       <div style="margin-bottom:12px;font-size:13px;color:var(--ink-soft);">
         <strong>${escapeHtml(p.customers?.name || p.customer_name_text || '—')}</strong> — ${fmtDate(p.pi_date)}<br>

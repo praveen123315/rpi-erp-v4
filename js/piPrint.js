@@ -40,7 +40,13 @@ function itemLabel(name, group, shade, pack) {
 export function printPi(pi, lines) {
   let totalPcs = 0, totalVol = 0, grandTotal = 0;
 
-  const rows = (lines || []).map(l => {
+  // A lot of historical (migrated) PIs carry leftover zero-qty/zero-amount
+  // "empty slot" lines from the old Sheets import. They contribute nothing
+  // and should never show up as a ghost "0 Pcs. — ₹0.00" row on a printed
+  // document.
+  const realLines = (lines || []).filter(l => Number(l.pcs || 0) !== 0 || Number(l.total_value || 0) !== 0);
+
+  const rows = realLines.map(l => {
     totalPcs += Number(l.pcs || 0);
     totalVol += Number(l.litres || 0);
     grandTotal += Number(l.total_value || 0);
